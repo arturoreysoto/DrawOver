@@ -1,9 +1,22 @@
 import SwiftUI
 import AppKit
 
+class ToolbarWindow: NSWindow {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        guard let screen = screen ?? NSScreen.main else { return frameRect }
+        let screenRect = screen.visibleFrame
+        var newRect = frameRect
+        if newRect.minX < screenRect.minX { newRect.origin.x = screenRect.minX }
+        if newRect.minY < screenRect.minY { newRect.origin.y = screenRect.minY }
+        if newRect.maxX > screenRect.maxX { newRect.origin.x = screenRect.maxX - newRect.width }
+        if newRect.maxY > screenRect.maxY { newRect.origin.y = screenRect.maxY - newRect.height }
+        return newRect
+    }
+}
+
 class ToolbarWindowController: NSWindowController {
     convenience init(appDelegate: AppDelegate) {
-        let window = NSWindow(
+        let window = ToolbarWindow(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 52),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -12,7 +25,7 @@ class ToolbarWindowController: NSWindowController {
         window.level = .statusBar
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.hasShadow = true
+        window.hasShadow = false
         window.isMovableByWindowBackground = true
         window.center()
         window.contentView = NSHostingView(rootView: ToolbarView(appDelegate: appDelegate))
@@ -31,12 +44,22 @@ enum SketchTool {
     case trash
 }
 
+struct GlassModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(in: RoundedRectangle(cornerRadius: 34))
+        } else {
+            content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 34))
+        }
+    }
+}
+
 struct ToolbarView: View {
     let appDelegate: AppDelegate
     @State private var selectedTool: SketchTool = .cursor
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 24) {
             ToolButton(icon: "pointer.arrow.ipad", tool: .cursor, selected: $selectedTool, appDelegate: appDelegate)
             ToolButton(icon: "pencil.tip", tool: .pencil, selected: $selectedTool, appDelegate: appDelegate)
             ToolButton(icon: "square", tool: .rectangle, selected: $selectedTool, appDelegate: appDelegate)
@@ -48,7 +71,7 @@ struct ToolbarView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .modifier(GlassModifier())
     }
 }
 
@@ -57,6 +80,7 @@ struct ToolButton: View {
     let tool: SketchTool
     @Binding var selected: SketchTool
     let appDelegate: AppDelegate
+    @State private var isHovered = false
 
     var body: some View {
         Button {
@@ -73,13 +97,17 @@ struct ToolButton: View {
                 ToolState.shared.isCursorMode = false
                 appDelegate.overlayWindow?.ignoresMouseEvents = false
                 appDelegate.overlayWindow?.orderFront(nil)
-                print("Lápiz - overlayWindow: \(String(describing: appDelegate.overlayWindow))")
             }
         } label: {
             Image(systemName: icon)
                 .font(.system(size: 18))
                 .foregroundStyle(selected == tool ? .primary : .secondary)
+                .scaleEffect(isHovered ? 1.2 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isHovered)
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
