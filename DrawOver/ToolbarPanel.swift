@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 class ToolbarWindow: NSPanel {
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
@@ -17,7 +18,7 @@ class ToolbarWindow: NSPanel {
 class ToolbarWindowController: NSWindowController {
     convenience init(appDelegate: AppDelegate) {
         let window = ToolbarWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 52),
+            contentRect: NSRect(x: 0, y: 0, width: 580, height: 52),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -39,8 +40,8 @@ enum SketchTool {
     case rectangle
     case circle
     case line
-    case scribble
     case eraser
+    case share
     case trash
 }
 
@@ -57,21 +58,82 @@ struct GlassModifier: ViewModifier {
 struct ToolbarView: View {
     let appDelegate: AppDelegate
     @State private var selectedTool: SketchTool = .cursor
+    @ObservedObject private var toolState = ToolState.shared
+
+    let colors: [Color] = [.black, .white, .red, .orange, .yellow, .green, .blue, .purple]
 
     var body: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 16) {
             ToolButton(icon: "pointer.arrow.ipad", tool: .cursor, selected: $selectedTool, appDelegate: appDelegate)
             ToolButton(icon: "pencil.tip", tool: .pencil, selected: $selectedTool, appDelegate: appDelegate)
             ToolButton(icon: "square", tool: .rectangle, selected: $selectedTool, appDelegate: appDelegate)
             ToolButton(icon: "circle", tool: .circle, selected: $selectedTool, appDelegate: appDelegate)
             ToolButton(icon: "line.diagonal", tool: .line, selected: $selectedTool, appDelegate: appDelegate)
-            ToolButton(icon: "scribble", tool: .scribble, selected: $selectedTool, appDelegate: appDelegate)
             ToolButton(icon: "eraser", tool: .eraser, selected: $selectedTool, appDelegate: appDelegate)
+
+            // Separador
+            Divider()
+                .frame(height: 20)
+                .opacity(0.3)
+
+            // Colores
+            HStack(spacing: 8) {
+                ForEach(colors, id: \.self) { color in
+                    Button {
+                        toolState.currentColor = color
+                    } label: {
+                        Circle()
+                            .fill(color)
+                            .frame(width: 16, height: 16)
+                            .overlay(
+                                Circle().stroke(
+                                    toolState.currentColor == color ? Color.primary : Color.primary.opacity(0.15),
+                                    lineWidth: toolState.currentColor == color ? 2 : 1
+                                )
+                            )
+                            .scaleEffect(toolState.currentColor == color ? 1.2 : 1.0)
+                            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: toolState.currentColor == color)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Separador
+            Divider()
+                .frame(height: 20)
+                .opacity(0.3)
+
+            // Compartir
+            Button {
+                saveScreenshot(appDelegate: appDelegate)
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Color.secondary)
+            }
+            .buttonStyle(.plain)
+
             ToolButton(icon: "trash", tool: .trash, selected: $selectedTool, appDelegate: appDelegate)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .modifier(GlassModifier())
+    }
+}
+
+func saveScreenshot(appDelegate: AppDelegate) {
+    guard let screen = NSScreen.main else { return }
+    let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as! CGDirectDisplayID
+    guard let cgImage = CGDisplayCreateImage(displayID) else { return }
+    let panel = NSSavePanel()
+    panel.allowedContentTypes = [.png]
+    panel.nameFieldStringValue = "DrawOver-capture.png"
+    panel.begin { response in
+        guard response == .OK, let url = panel.url else { return }
+        let rep = NSBitmapImageRep(cgImage: cgImage)
+        if let data = rep.representation(using: .png, properties: [:]) {
+            try? data.write(to: url)
+        }
     }
 }
 

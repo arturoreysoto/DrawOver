@@ -57,7 +57,7 @@ struct DrawingView: View {
                     }
                     
                     if currentShape.points.isEmpty {
-                        currentShape = DrawnShape(type: toolState.currentTool, points: [], color: .black, width: 6)
+                        currentShape = DrawnShape(type: toolState.currentTool, points: [], color: toolState.currentColor, width: 6)
                     }
                     
                     switch toolState.currentTool {

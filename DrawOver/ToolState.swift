@@ -5,6 +5,7 @@ class ToolState: ObservableObject {
     static let shared = ToolState()
     @Published var currentTool: ShapeType = .line
     @Published var isCursorMode: Bool = false
+    @Published var currentColor: Color = .black
 }
 
 enum ShapeType {
