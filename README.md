@@ -5,7 +5,6 @@
 DrawOver is a free, native macOS drawing overlay app. It sits on top of every window, letting you draw, annotate and highlight anything on your screen — perfect for presentations, tutorials, and walkthroughs.
 
 ![DrawOver Toolbar](splash_github_drawover.png)
-
 ## Features
 
 - ✏️ **Freehand drawing** — natural pencil tool
