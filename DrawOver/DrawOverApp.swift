@@ -34,6 +34,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var eventMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Asegura que hay un valor por defecto guardado
+        if UserDefaults.standard.string(forKey: "shortcutKey") == nil {
+            UserDefaults.standard.set("s", forKey: "shortcutKey")
+        }
         overlayWindow = DrawingOverlayWindow()
         overlayWindow?.ignoresMouseEvents = true
         showToolbar()
@@ -43,16 +47,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func setupGlobalShortcut() {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
         }
         let key = UserDefaults.standard.string(forKey: "shortcutKey") ?? "s"
+
+        // Monitor global — cuando otra app tiene el foco
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
             let cmdShift = event.modifierFlags.contains([.command, .shift])
             if cmdShift && event.charactersIgnoringModifiers == key {
-                DispatchQueue.main.async {
-                    self.toggleToolbar()
-                }
+                DispatchQueue.main.async { self.toggleToolbar() }
             }
         }
+
+        // Monitor local — cuando DrawOver tiene el foco
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let cmdShift = event.modifierFlags.contains([.command, .shift])
+            if cmdShift && event.charactersIgnoringModifiers == key {
+                DispatchQueue.main.async { self.toggleToolbar() }
+                return nil
+            }
+            return event
+        }
+    
     }
 
     func showToolbar() {
@@ -72,6 +88,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             showToolbar()
             ToolState.shared.isCursorMode = true
             overlayWindow?.ignoresMouseEvents = true
+            overlayWindow?.orderOut(nil) // ← añade esto
         }
     }
 }
@@ -122,9 +139,13 @@ struct SettingsView: View {
     }
 
     func startRecording() {
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            guard self.isRecording else { return event }
             let key = event.charactersIgnoringModifiers ?? ""
-            guard !key.isEmpty else { return event }
+            guard !key.isEmpty && key != "\u{1B}" else {
+                self.isRecording = false
+                return nil
+            }
             self.shortcutKey = key
             self.isRecording = false
             UserDefaults.standard.set(key, forKey: "shortcutKey")
